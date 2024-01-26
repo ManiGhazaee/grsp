@@ -1,18 +1,17 @@
 use std::{
-    fs::{read_dir, File, OpenOptions},
-    io::{Read, Seek, SeekFrom, Write},
+    fs::{read_dir, File},
+    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
 };
 
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::prelude::*;
 use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, WriteColor};
 
 #[derive(Debug)]
 pub struct Match {
     ln: usize,
     col: Vec<usize>,
-    ln_str: String,
+    ln_str: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -35,20 +34,42 @@ pub fn get_paths(result: &mut Vec<PathBuf>, path: PathBuf) {
 
 pub fn match_par(path: &Path, pat: &[u8], pat_len: usize) {
     if path.is_file() {
-        let mut file_string = String::new();
-        let mut file = match OpenOptions::new().read(true).open(&path) {
+        let mut file = match File::open(path) {
             Ok(v) => v,
             Err(_) => return,
         };
         if is_binary(&mut file) {
             return;
         }
-        if let Err(_) = file.read_to_string(&mut file_string) {
-            return;
+        let reader = BufReader::new(file);
+        let mut matches: Vec<Match> = Vec::new();
+        for (line_idx, line) in reader.lines().enumerate() {
+            let line = match line {
+                Ok(l) => l,
+                _ => continue,
+            };
+            if pat_len > line.len() {
+                continue;
+            }
+            let line = line.as_bytes();
+            let mut col: Vec<usize> = Vec::new();
+            let mut i = 0;
+            while i <= line.len() - pat_len {
+                if &line[i..i + pat_len] == pat {
+                    col.push(i + 1);
+                }
+                i += 1;
+            }
+            if col.is_empty() {
+                continue;
+            }
+            matches.push(Match {
+                ln: line_idx + 1,
+                col,
+                ln_str: line.to_vec(),
+            });
         }
-        let matches = find_matches_par(&file_string, &pat, pat_len);
         print_matches(&matches, &path, pat_len);
-        return;
     } else if path.is_dir() {
         read_dir(path)
             .unwrap()
@@ -61,66 +82,93 @@ pub fn match_par(path: &Path, pat: &[u8], pat_len: usize) {
     }
 }
 
-pub fn _match_par(path: &Path, pat: &[u8], pat_len: usize, matches_res: &Arc<Mutex<Vec<Matches>>>) {
-    if path.is_file() {
-        let mut file_string = String::new();
-        let mut file = match OpenOptions::new().read(true).open(&path) {
-            Ok(v) => v,
-            Err(_) => return,
-        };
-        if is_binary(&mut file) {
-            return;
-        }
-        if let Err(_) = file.read_to_string(&mut file_string) {
-            return;
-        }
-        let matches = find_matches_par(&file_string, &pat, pat_len);
-        matches_res.lock().unwrap().push(Matches {
-            m: matches,
-            path: path.into(),
-        });
-    } else if path.is_dir() {
-        read_dir(path)
-            .unwrap()
-            .into_iter()
-            .par_bridge()
-            .for_each(|entry| {
-                let path = entry.unwrap().path();
-                _match_par(&path, pat, pat_len, matches_res);
-            });
-    }
-}
+// pub fn match_par_x(path: &Path, pat: &[u8], pat_len: usize) {
+//     if path.is_file() {
+//         let mut file_string = String::new();
+//         let mut file = match OpenOptions::new().read(true).open(&path) {
+//             Ok(v) => v,
+//             Err(_) => return,
+//         };
+//         if is_binary(&mut file) {
+//             return;
+//         }
+//         if let Err(_) = file.read_to_string(&mut file_string) {
+//             return;
+//         }
+//         let matches = find_matches_par(&file_string, &pat, pat_len);
+//         print_matches(&matches, &path, pat_len);
+//     } else if path.is_dir() {
+//         read_dir(path)
+//             .unwrap()
+//             .into_iter()
+//             .par_bridge()
+//             .for_each(|entry| {
+//                 let path = entry.unwrap().path();
+//                 match_par(&path, pat, pat_len);
+//             });
+//     }
+// }
 
-pub fn find_matches_par(file_string: &str, pat: &[u8], pat_len: usize) -> Vec<Match> {
-    let matches: Arc<Mutex<Vec<Match>>> = Arc::new(Mutex::new(Vec::new()));
-    file_string
-        .lines()
-        .enumerate()
-        .par_bridge()
-        .for_each(|(line_idx, line)| {
-            if pat_len > line.len() {
-                return;
-            }
-            let line = line.as_bytes();
-            let mut col: Vec<usize> = Vec::new();
-            let mut i = 0;
-            while i <= line.len() - pat_len {
-                if &line[i..i + pat_len] == pat {
-                    col.push(i + 1);
-                }
-                i += 1;
-            }
-            if col.is_empty() {
-                return;
-            }
-            matches.lock().unwrap().push(Match {
-                ln: line_idx + 1,
-                col,
-                ln_str: String::from_utf8_lossy(line).to_string(),
-            })
-        });
-    Arc::try_unwrap(matches).unwrap().into_inner().unwrap()
-}
+// pub fn _match_par(path: &Path, pat: &[u8], pat_len: usize, matches_res: &Arc<Mutex<Vec<Matches>>>) {
+//     if path.is_file() {
+//         let mut file_string = String::new();
+//         let mut file = match OpenOptions::new().read(true).open(&path) {
+//             Ok(v) => v,
+//             Err(_) => return,
+//         };
+//         if is_binary(&mut file) {
+//             return;
+//         }
+//         if let Err(_) = file.read_to_string(&mut file_string) {
+//             return;
+//         }
+//         let matches = find_matches_par(&file_string, &pat, pat_len);
+//         matches_res.lock().unwrap().push(Matches {
+//             m: matches,
+//             path: path.into(),
+//         });
+//     } else if path.is_dir() {
+//         read_dir(path)
+//             .unwrap()
+//             .into_iter()
+//             .par_bridge()
+//             .for_each(|entry| {
+//                 let path = entry.unwrap().path();
+//                 _match_par(&path, pat, pat_len, matches_res);
+//             });
+//     }
+// }
+
+// pub fn find_matches_par(file_string: &str, pat: &[u8], pat_len: usize) -> Vec<Match> {
+//     let matches: Arc<Mutex<Vec<Match>>> = Arc::new(Mutex::new(Vec::new()));
+//     file_string
+//         .lines()
+//         .enumerate()
+//         .par_bridge()
+//         .for_each(|(line_idx, line)| {
+//             if pat_len > line.len() {
+//                 return;
+//             }
+//             let line = line.as_bytes();
+//             let mut col: Vec<usize> = Vec::new();
+//             let mut i = 0;
+//             while i <= line.len() - pat_len {
+//                 if &line[i..i + pat_len] == pat {
+//                     col.push(i + 1);
+//                 }
+//                 i += 1;
+//             }
+//             if col.is_empty() {
+//                 return;
+//             }
+//             matches.lock().unwrap().push(Match {
+//                 ln: line_idx + 1,
+//                 col,
+//                 ln_str: String::from_utf8_lossy(line).to_string(),
+//             })
+//         });
+//     Arc::try_unwrap(matches).unwrap().into_inner().unwrap()
+// }
 
 pub fn print_matches(matches: &Vec<Match>, path: &Path, pat_len: usize) {
     if matches.is_empty() {
@@ -146,21 +194,20 @@ pub fn print_matches(matches: &Vec<Match>, path: &Path, pat_len: usize) {
         let mut j = 0;
         for i in m.col.iter() {
             let col = i - 1;
-            write!(b, "{}", m.ln_str[j..col].to_string()).unwrap();
+            b.write(&m.ln_str[j..col]).unwrap();
+            // write!(b, "{}", &m.ln_str[j..col]).unwrap();
             b.set_color(&red).unwrap();
-            write!(b, "{}", m.ln_str[col..col + pat_len].to_string()).unwrap();
+            b.write(&m.ln_str[col..col + pat_len]).unwrap();
+            // write!(b, "{}", &m.ln_str[col..col + pat_len]).unwrap();
             b.reset().unwrap();
             j = col + pat_len;
         }
-        write!(
-            b,
-            "{}",
-            m.ln_str[m.col[m.col.len() - 1] - 1 + pat_len..].to_string()
-        )
-        .unwrap();
-        writeln!(b, "").unwrap();
+        b.write(&m.ln_str[m.col[m.col.len() - 1] - 1 + pat_len..])
+            .unwrap();
+        // write!(b, "{}", &m.ln_str[m.col[m.col.len() - 1] - 1 + pat_len..]).unwrap();
+        write!(b, "\n").unwrap();
     }
-    writeln!(b, "").unwrap();
+    write!(b, "\n").unwrap();
     bw.print(&b).unwrap();
 }
 
