@@ -22,7 +22,7 @@ fn main() {
     };
     let pat_len = pat.len();
 
-    match_par(Path::new(path), pat, pat_len);
+    match_par(Path::new(path), pat.as_bytes(), pat_len);
 
     println!("{}ms", inst.elapsed().as_millis())
 }

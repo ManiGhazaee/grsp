@@ -33,7 +33,7 @@ pub fn get_paths(result: &mut Vec<PathBuf>, path: PathBuf) {
     }
 }
 
-pub fn match_par(path: &Path, pat: &str, pat_len: usize) {
+pub fn match_par(path: &Path, pat: &[u8], pat_len: usize) {
     if path.is_file() {
         let mut file_string = String::new();
         let mut file = match OpenOptions::new().read(true).open(&path) {
@@ -61,7 +61,7 @@ pub fn match_par(path: &Path, pat: &str, pat_len: usize) {
     }
 }
 
-pub fn _match_par(path: &Path, pat: &str, pat_len: usize, matches_res: &Arc<Mutex<Vec<Matches>>>) {
+pub fn _match_par(path: &Path, pat: &[u8], pat_len: usize, matches_res: &Arc<Mutex<Vec<Matches>>>) {
     if path.is_file() {
         let mut file_string = String::new();
         let mut file = match OpenOptions::new().read(true).open(&path) {
@@ -91,7 +91,7 @@ pub fn _match_par(path: &Path, pat: &str, pat_len: usize, matches_res: &Arc<Mute
     }
 }
 
-pub fn find_matches_par(file_string: &str, pat: &str, pat_len: usize) -> Vec<Match> {
+pub fn find_matches_par(file_string: &str, pat: &[u8], pat_len: usize) -> Vec<Match> {
     let matches: Arc<Mutex<Vec<Match>>> = Arc::new(Mutex::new(Vec::new()));
     file_string
         .lines()
@@ -101,6 +101,7 @@ pub fn find_matches_par(file_string: &str, pat: &str, pat_len: usize) -> Vec<Mat
             if pat_len > line.len() {
                 return;
             }
+            let line = line.as_bytes();
             let mut col: Vec<usize> = Vec::new();
             let mut i = 0;
             while i <= line.len() - pat_len {
@@ -115,7 +116,7 @@ pub fn find_matches_par(file_string: &str, pat: &str, pat_len: usize) -> Vec<Mat
             matches.lock().unwrap().push(Match {
                 ln: line_idx + 1,
                 col,
-                ln_str: line.to_string(),
+                ln_str: String::from_utf8_lossy(line).to_string(),
             })
         });
     Arc::try_unwrap(matches).unwrap().into_inner().unwrap()
