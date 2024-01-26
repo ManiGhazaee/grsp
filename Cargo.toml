@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 repository = "https://github.com/ManiGhazaee/grsp"
 authors = ["ManiGhazaee <hosseinghazaee1@gmail.com>"]
-description = "Recursively searches directories for a string"
+description = "A search tool that recursively searches current directory for a string"
 readme = "README.md"
 
 
