@@ -6,6 +6,7 @@ repository = "https://github.com/ManiGhazaee/grsp"
 authors = ["ManiGhazaee <hosseinghazaee1@gmail.com>"]
 description = "A search tool that recursively searches current directory for a string"
 readme = "README.md"
+license = "MIT"
 
 
 [dependencies]
