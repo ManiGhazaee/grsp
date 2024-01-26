@@ -103,7 +103,7 @@ pub fn find_matches_par(file_string: &str, pat: &str, pat_len: usize) -> Vec<Mat
             }
             let mut col: Vec<usize> = Vec::new();
             let mut i = 0;
-            while i < line.len() - pat_len {
+            while i <= line.len() - pat_len {
                 if &line[i..i + pat_len] == pat {
                     col.push(i + 1);
                 }
@@ -135,7 +135,7 @@ pub fn print_matches(matches: &Vec<Match>, path: &Path, pat_len: usize) {
 
     let bw = BufferWriter::stdout(ColorChoice::Always);
     let mut b = bw.buffer();
-    b.set_color(&red).unwrap();
+    b.set_color(&green).unwrap();
     writeln!(b, "{}", path.to_str().unwrap()).unwrap();
     for m in matches {
         b.set_color(&cyan).unwrap();
@@ -146,7 +146,7 @@ pub fn print_matches(matches: &Vec<Match>, path: &Path, pat_len: usize) {
         for i in m.col.iter() {
             let col = i - 1;
             write!(b, "{}", m.ln_str[j..col].to_string()).unwrap();
-            b.set_color(&green).unwrap();
+            b.set_color(&red).unwrap();
             write!(b, "{}", m.ln_str[col..col + pat_len].to_string()).unwrap();
             b.reset().unwrap();
             j = col + pat_len;

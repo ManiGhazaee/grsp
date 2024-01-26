@@ -13,6 +13,9 @@ fn main() {
         "./"
     };
     let pat = if let Some(pat) = args.get(1) {
+        if pat.is_empty() {
+            panic!("Pattern is empty");
+        }
         pat
     } else {
         panic!("Pattern not provided");
