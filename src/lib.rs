@@ -18,7 +18,7 @@ pub fn search_par(path: &Path, pat: &[u8], pat_len: usize) {
     if path.is_file() {
         let mut file = match File::open(path) {
             Ok(v) => v,
-            Err(_) => return,
+            _ => return,
         };
         if is_binary(&mut file) {
             return;
@@ -51,16 +51,19 @@ pub fn search_par(path: &Path, pat: &[u8], pat_len: usize) {
                 ln_str: line.to_vec(),
             });
         }
-        print_matches(&matches, &path, pat_len).unwrap();
+        let _ = print_matches(&matches, &path, pat_len);
     } else if path.is_dir() {
-        read_dir(path)
-            .unwrap()
-            .into_iter()
-            .par_bridge()
-            .for_each(|entry| {
-                let path = entry.unwrap().path();
+        if let Ok(d) = read_dir(path) {
+            d.into_iter().par_bridge().for_each(|entry| {
+                let path = match entry {
+                    Ok(e) => e.path(),
+                    _ => return,
+                };
                 search_par(&path, pat, pat_len);
             });
+        } else {
+            return;
+        }
     };
 }
 
@@ -79,7 +82,7 @@ pub fn print_matches(matches: &Vec<Match>, path: &Path, pat_len: usize) -> io::R
     let bw = BufferWriter::stdout(ColorChoice::Always);
     let mut b = bw.buffer();
     b.set_color(&green)?;
-    writeln!(b, "{}", path.to_str().unwrap())?;
+    writeln!(b, "{}", path.to_str().unwrap_or(""))?;
 
     for m in matches {
         b.set_color(&cyan)?;
