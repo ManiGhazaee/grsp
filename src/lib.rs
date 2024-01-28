@@ -39,6 +39,8 @@ pub fn search_par(path: &Path, pat: &[u8], pat_len: usize) {
             while i <= line.len() - pat_len {
                 if &line[i..i + pat_len] == pat {
                     col.push(i + 1);
+                    i += pat_len;
+                    continue;
                 }
                 i += 1;
             }
